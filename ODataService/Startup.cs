@@ -3,6 +3,7 @@ using Microsoft.AspNet.OData.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ODataService.Modes;
@@ -21,19 +22,15 @@ namespace ODataService
 		// This method gets called by the runtime. Use this method to add services to the container.
 		public void ConfigureServices(IServiceCollection services)
 		{
-			services.AddMvc(options => {
-				options.EnableEndpointRouting = false;
-			}).SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+			services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+			var connection = @"server=localhost;port=5432;user id=postgres;password=postgres;database=WSDB";
+			services.AddDbContext<WSDbContext>(options => options.UseNpgsql(connection));
 			services.AddOData();
-			services.AddODataQueryFilter();
 		}
 
 		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
 		public void Configure(IApplicationBuilder app, IHostingEnvironment env)
 		{
-			var builder = new ODataConventionModelBuilder(app.ApplicationServices);
-			builder.EntitySet<Product>("Products");
-
 			if (env.IsDevelopment())
 			{
 				app.UseDeveloperExceptionPage();
@@ -46,13 +43,9 @@ namespace ODataService
 
 			app.UseHttpsRedirection();
 
-			app.UseMvc(routeBuilder =>
-			{
-				// and this line to enable OData query option, for example $filter
-				routeBuilder.Select().Expand().Filter().OrderBy().MaxTop(100).Count();
-				routeBuilder.MapODataServiceRoute("ODataRoute", "odata", builder.GetEdmModel());
-				// uncomment the following line to Work-around for #1175 in beta1
+			app.UseMvc(routeBuilder => {
 				routeBuilder.EnableDependencyInjection();
+				routeBuilder.Expand().Select().Count().OrderBy();
 			});
 		}
 	}
